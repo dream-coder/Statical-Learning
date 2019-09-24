@@ -1,0 +1,151 @@
+**Resampling Methods**
+
+```{r}
+library(ISLR)
+library(boot)
+```
+
+
+```{r, echo=FALSE}
+attach(Auto)
+plot(mpg~horsepower, data= Auto)
+
+```
+## Validation set
+
+```{r}
+set.seed(1)
+train= sample(392,196)
+lm.fit = lm(mpg~horsepower, data=Auto, subset=train)
+```
+Taking mean to get the mean sqaured error 
+```{r}
+mean((mpg-predict(lm.fit, Auto))[-train]^2)
+```
+
+##LOOCV
+
+```{r}
+glm.fit = glm(mpg~horsepower, data=Auto)
+cv.err = cv.glm(Auto, glm.fit)
+cv.err$delta
+```
+First no. is raw LOOCV result and 2nd one is bias corrected version of it.
+
+Above method for calculating cross validation error for LOOCV does not use the below formula for calculating the LOOCV error.
+$$ CV_{n} = \frac{1}{n}\sum_{i=1}^{n} (\frac{y_{i}- \hat{y_{i}}}{1-h_{i}})^2$$
+
+So we will write a function for it. 
+
+``` {r}
+loocv=function(fit){
+  h = lm.influence(fit)$h
+  mean((residuals(fit)/(1-h))^2)
+}
+```
+Now testing out function:
+
+```{r}
+loocv(glm.fit)
+```
+
+We can also initiate a for loop to compute cross validation error for different models. 
+```{r}
+cv.error = rep(0.5)
+for (i in 1:5){
+glm.fit = glm(mpg~poly(horsepower,i), data= Auto)
+cv.error[i] = loocv(glm.fit)
+}
+cv.error
+```
+Plotting different MSE:
+
+```{r, echo=FALSE}
+plot(1:5, cv.error, type='b')
+```
+
+## K-Fold Cross Validation
+ We will do 10-fold cross validation.
+
+```{r}
+cv.error10 = rep(0,5)
+for (i in 1:5){
+  glm.fit = glm(mpg~poly(horsepower,i), data=Auto)
+  cv.error10[i] = cv.glm(Auto,glm.fit, K=10)$delta[1]
+}
+plot(1:5, cv.error, type='b')
+lines(1:5,cv.error10, type='b', col='red')
+```
+##Bootstrap
+
+Performing a bootstrap analysis in R entails only two steps.
+First, we must create a function that computes the statistic of interest.
+Second, we use the boot() function, which is part of the boot library, to boot() perform the bootstrap by repeatedly sampling observations from the data
+set with replacement.
+
+```{r}
+alpha= function(x,y){
+vx= var(x)
+vy= var(y)
+cxy = cov(x,y)
+(vy-cxy)/(vx+vy-2*cxy)
+}
+
+alpha(Portfolio$X, Portfolio$Y)
+```
+Now to find standard error of Alpha we will use bootstrap function. (Look up with function)
+
+```{r}
+alpha.fn = function(data, index){
+with(data[index,],alpha(X,Y))
+}
+
+```
+above function  will compute alpha for given number of index.
+
+
+Now we will perform the bootstrap
+
+```{r}
+set.seed(1)
+alpha.fn(Portfolio, sample(1:100,100,replace = TRUE))
+```
+
+We can implement a bootstrap analysis by performing this command many
+times, recording all of the corresponding estimates for ??, and computing the resulting standard deviation.
+
+
+However, the boot() function automates this approach. Below we produce R = 1000 bootstrap estimates for ??.
+
+```{r}
+boot.out = boot(Portfolio, alpha.fn, R=1000)
+plot(boot.out)
+
+```
+The bootstrap approach can be used to assess the variability of the coefficient estimates and predictions from a statistical learning method. Here
+we use the bootstrap approach in order to assess the variability of the
+estimates for ??0 and ??1, the intercept and slope terms for the linear regression model that uses horsepower to predict mpg in the Auto data set.
+
+We first create a simple function, boot.fn(), which takes in the Auto data
+set as well as a set of indices for the observations, and returns the intercept
+and slope estimates for the linear regression model. We then apply this
+function to the full set of 392 observations in order to compute the estimates of ??0 and ??1 on the entire data set using the usual linear regression coefficient estimate formulas.
+
+
+```{r}
+boot.fn = function (data,index){
+  return(coef(lm(mpg~horsepower, data=data, subset=index)))
+}
+```
+We can create bootstrap estimates for intercept and slope terms.
+```{r}
+set.seed(1)
+boot.fn(Auto, sample(1:392,392, replace=T))
+```
+
+Now we will use boot() function to compute standard errors of 1000 bootstrap estimates for intercept and slope.
+
+```{r}
+boot(Auto,boot.fn,1000)
+```
+

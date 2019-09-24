@@ -1,0 +1,399 @@
+**Resampling Methods**
+
+```{r}
+library(ISLR)
+library(boot)
+```
+
+
+```{r, echo=FALSE}
+attach(Auto)
+plot(mpg~horsepower, data= Auto)
+
+```
+## Validation set
+
+```{r}
+set.seed(1)
+train= sample(392,196)
+lm.fit = lm(mpg~horsepower, data=Auto, subset=train)
+```
+Taking mean to get the mean sqaured error 
+```{r}
+mean((mpg-predict(lm.fit, Auto))[-train]^2)
+```
+
+##LOOCV
+
+```{r}
+glm.fit = glm(mpg~horsepower, data=Auto)
+cv.err = cv.glm(Auto, glm.fit)
+cv.err$delta
+```
+First no. is raw LOOCV result and 2nd one is bias corrected version of it.
+
+Above method for calculating cross validation error for LOOCV does not use the below formula for calculating the LOOCV error.
+$$ CV_{n} = \frac{1}{n}\sum_{i=1}^{n} (\frac{y_{i}- \hat{y_{i}}}{1-h_{i}})^2$$
+
+So we will write a function for it. 
+
+``` {r}
+loocv=function(fit){
+  h = lm.influence(fit)$h
+  mean((residuals(fit)/(1-h))^2)
+}
+```
+Now testing out function:
+
+```{r}
+loocv(glm.fit)
+```
+
+We can also initiate a for loop to compute cross validation error for different models. 
+```{r}
+cv.error = rep(0.5)
+for (i in 1:5){
+glm.fit = glm(mpg~poly(horsepower,i), data= Auto)
+cv.error[i] = loocv(glm.fit)
+}
+cv.error
+```
+Plotting different MSE:
+
+```{r, echo=FALSE}
+plot(1:5, cv.error, type='b')
+```
+
+## K-Fold Cross Validation
+ We will do 10-fold cross validation.
+
+```{r}
+cv.error10 = rep(0,5)
+for (i in 1:5){
+  glm.fit = glm(mpg~poly(horsepower,i), data=Auto)
+  cv.error10[i] = cv.glm(Auto,glm.fit, K=10)$delta[1]
+}
+plot(1:5, cv.error, type='b')
+lines(1:5,cv.error10, type='b', col='red')
+```
+##Bootstrap
+
+Performing a bootstrap analysis in R entails only two steps.
+First, we must create a function that computes the statistic of interest.
+Second, we use the boot() function, which is part of the boot library, to boot() perform the bootstrap by repeatedly sampling observations from the data
+set with replacement.
+
+```{r}
+alpha= function(x,y){
+vx= var(x)
+vy= var(y)
+cxy = cov(x,y)
+(vy-cxy)/(vx+vy-2*cxy)
+}
+
+alpha(Portfolio$X, Portfolio$Y)
+```
+Now to find standard error of Alpha we will use bootstrap function. (Look up with function)
+
+```{r}
+alpha.fn = function(data, index){
+with(data[index,],alpha(X,Y))
+}
+
+```
+above function  will compute alpha for given number of index.
+
+
+Now we will perform the bootstrap
+
+```{r}
+set.seed(1)
+alpha.fn(Portfolio, sample(1:100,100,replace = TRUE))
+```
+
+We can implement a bootstrap analysis by performing this command many
+times, recording all of the corresponding estimates for ??, and computing the resulting standard deviation.
+
+
+However, the boot() function automates this approach. Below we produce R = 1000 bootstrap estimates for ??.
+
+```{r}
+boot.out = boot(Portfolio, alpha.fn, R=1000)
+plot(boot.out)
+
+```
+The bootstrap approach can be used to assess the variability of the coefficient estimates and predictions from a statistical learning method. Here
+we use the bootstrap approach in order to assess the variability of the
+estimates for ??0 and ??1, the intercept and slope terms for the linear regression model that uses horsepower to predict mpg in the Auto data set.
+
+We first create a simple function, boot.fn(), which takes in the Auto data
+set as well as a set of indices for the observations, and returns the intercept
+and slope estimates for the linear regression model. We then apply this
+function to the full set of 392 observations in order to compute the estimates of ??0 and ??1 on the entire data set using the usual linear regression coefficient estimate formulas.
+
+
+```{r}
+boot.fn = function (data,index){
+  return(coef(lm(mpg~horsepower, data=data, subset=index)))
+}
+```
+We can create bootstrap estimates for intercept and slope terms.
+```{r}
+set.seed(1)
+boot.fn(Auto, sample(1:392,392, replace=T))
+```
+
+Now we will use boot() function to compute standard errors of 1000 bootstrap estimates for intercept and slope.
+
+```{r}
+boot(Auto,boot.fn,1000)
+```
+##Exercises:
+
+###**Question.No- 5**
+
+```{r}
+train = sample(dim(Default)[1],dim(Default)[1]/2)
+```
+Above train variable is giving 5000 different indices from 10000 indices(10000 observations)
+
+```{r}
+glm.fit2 = glm(default~income+balance, data= Default, family= binomial, subset = train)
+
+glm.probs = predict(glm.fit2, newdata = Default[-train,], type="response")
+
+glm.pred = ifelse(glm.probs >0.5,"Yes", "No")
+
+mean(glm.pred != Default$default[-train])
+
+```
+Now, we can combine this 2 code chunks into one function to efficiently answer for C part.
+
+```{r}
+Default_validation = function(){
+  train = sample(dim(Default)[1],dim(Default)[1]/2)
+
+glm.fit2 = glm(default~income+balance, data= Default, family= binomial, subset = train)
+
+glm.probs = predict(glm.fit2, newdata = Default[-train,], type="response")
+
+glm.pred = ifelse(glm.probs >0.5,"Yes", "No")
+
+mean(glm.pred != Default$default[-train])
+}
+```
+
+We can now repeat process any no.of times.
+
+**D part**
+
+
+
+```{r}
+train = sample(dim(Default)[1], dim(Default)[1]/2)
+glm.fit3 = glm(default~income+balance+student, data= Default, family= binomial, subset= train)
+
+glm.probs1 =  predict(glm.fit3, newdata= Default[-train,], type= "response")
+glm.pred1 = ifelse(glm.probs1>0.5, "Yes","No")
+
+mean(glm.pred1!=Default$default[-train])
+
+
+```
+Including a dummy variable(Student) does not lead to reduction in test error rate.
+
+###Question.no.-6
+**a**
+```{r}
+set.seed(1)
+glm.fit4 = glm(default~income+balance, data= Default, family= binomial)
+
+summary(glm.fit4)
+
+```
+**b**
+```{r}
+boot.fn = function(data, index){
+  
+  return(coef(glm(default~income+balance, data= data, family = binomial, subset = index)))
+  
+}
+```
+ **C**
+ Now, we will be estimating standard error of logistic regression coefficients using boot() method.
+ 
+```{r}
+boot(Default, boot.fn, 50)
+```
+ 
+###Question no.7
+**a**
+
+```{r}
+glm.fit5 = glm(Direction~Lag1+Lag2, data= Weekly, family= binomial)
+```
+
+**b**
+```{r}
+glm.fit6 = glm(Direction~Lag1+Lag2, data = Weekly, family= binomial, subset= 2:1089)
+```
+ **c**
+ 
+```{r}
+prediction = ifelse(predict(glm.fit6, newdata =Weekly[1,], type="response")>0.5,"Up","Down") 
+prediction
+```
+Checking if prediction is true
+```{r}
+prediction == Weekly$Direction[1]
+```
+
+**d**
+
+```{r}
+count = rep(0, dim(Weekly)[1])
+for(i in 1:dim(Weekly)[1]){
+  glm.fit7 = glm(Direction~Lag1+Lag2, data = Weekly[-i,], family= binomial)
+  
+is_up = predict(glm.fit7, newdata = Weekly[i,], type="response")>0.5
+
+True_up = Weekly[i,]$Direction == "Up"
+
+if (is_up != True_up){
+  count[i] = 1
+}
+}
+```
+Now, we can count total no. of errors by `r sum(count)`.
+
+And test error rate of `r mean(count) `
+
+###Question no.-8
+**a**
+generating a simulated data set.
+
+```{r}
+set.seed(1)
+y = rnorm(100)
+x = rnorm(100)
+y = x - 2*x^2 + rnorm(100)
+```
+n = 100
+p = 2
+
+$$ Y =  X- 2X^{2} + \epsilon $$
+**b**
+```{r}
+plot(x,y)
+```
+
+**c**
+```{r}
+library(boot)
+Data = data.frame(x,y)
+```
+(i)-
+```{r}
+glm.fit = glm(y~x)
+cv.glm(Data,glm.fit)$delta
+```
+(ii)-
+```{r}
+glm.fit = glm(y~poly(x,2))
+cv.glm(Data, glm.fit)$delta
+
+```
+
+(iii)-
+```{r}
+glm.fit = glm(y~poly(x,3))
+cv.glm(Data, glm.fit)$delta
+```
+
+(iv)-
+
+```{r}
+glm.fit = glm(y~poly(x,4))
+cv.glm(Data, glm.fit)$delta
+```
+**d**
+results will remain same as LOOCV does n-fold validation
+
+**e**
+Quadratic has lowest LOOCV error as true form of $Y$ is also Quadratic.
+
+**f**
+```{r}
+summary(glm.fit)
+```
+
+P value shows statiscal significance of linear and quadratic terms.
+
+
+###Question 9
+```{r}
+library(MASS)
+summary(Boston)
+```
+**a**
+```{r}
+medv.mean = mean(Boston$medv)
+```
+**b**
+```{r}
+standard_error = sd(Boston$medv)/sqrt(length(Boston$medv))
+```
+
+**c**
+
+```{r}
+boot.fn  = function(data,index){
+  return(mean(data[index]))
+}
+boots = boot(Boston$medv,boot.fn, 1000)
+boots
+```
+ This error is similar to obtained above.
+ 
+ **d**
+ bootstrap-
+ ```{r}
+ c(boots$t0 - 2*0.4097, boots$t0 + 2*0.4097)
+ ```
+ T- test-
+```{r}
+ t.test(Boston$medv)
+```
+ 
+**e**
+
+```{r}
+medv.med = median(Boston$medv)
+```
+
+**f**
+```{r}
+boot.fn = function(data,index) {
+  return(median(data[index]))
+}
+
+boots1 = boot(Boston$medv, boot.fn, 1000)
+boots1
+```
+
+**g**
+
+```{r}
+medv.tenth = quantile(Boston$medv, c(0.1))
+medv.tenth
+```
+**h**
+
+```{r}
+boot.fn = function(data,index){
+  return(quantile(data[index], c(0.1)))
+}
+boot(Boston$medv, boot.fn, 1000)
+```
+
+

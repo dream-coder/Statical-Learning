@@ -1,0 +1,249 @@
+#Linear Model selection
+
+
+```{r}
+library(ISLR)
+summary(Hitters)
+sum(is.na(Hitters))
+```
+
+We can see that there are some miisng values here so we will remove here.
+
+```{r}
+Hitters  = na.omit(Hitters)
+sum(is.na(Hitters$Salary))
+```
+##Best Subset Regression:
+-------------------------
+Best subset selection is performed using regsubsets() function which is part of leaps library.
+
+```{r}
+library(leaps)
+regfit.full = regsubsets(Salary~., data=Hitters)
+summary(regfit.full)
+```
+This output indicates that best two variable model contains only Hits and CRBI.
+
+By default, regsubsets() function give best subsets up to size 8 but we can increase it.
+
+```{r}
+regfit.full = regsubsets(Salary~., data= Hitters, nvmax = 19)
+reg.summary = summary(regfit.full)
+names(reg.summary)
+```
+We can get R^2^, RSS, adjusted R^2^, C~p~, bic. we can examine this to select best overall model.
+we can now plot errors to identify best model.
+
+```{r}
+plot(reg.summary$cp, xlab="No. of variables", ylab="Cp")
+```
+
+we can see that model with 10 variables has lowest Cp.
+
+ we can also use-
+```{r}
+which.min(reg.summary$cp)
+plot(reg.summary$cp, xlab="No. of variables", ylab="Cp")
+points(10,reg.summary$cp[10], pch=20, col="red")
+```
+
+The regsubsets() has a inbuilt plot method, which can be used.
+
+```{r}
+plot(regfit.full, scale="Cp")
+```
+
+For this plot we can see that for each value of Cp on y-axis:
+black corresponds to variables that are in and white that are out.
+
+we can get coefficients by:
+```{r}
+coef(regfit.full,10)
+```
+
+
+##Forward Stepwise Selection
+Here we also use regsubsets() function but with method="forward" as additional argument.
+
+```{r}
+regfit.fwd = regsubsets(Salary~., data= Hitters, nvmax=19, method="forward")
+summary(regfit.fwd)
+plot(regfit.fwd, scale="Cp")
+```
+
+
+
+##Model Selection Using Validation Set:
+
+we must use only the training observations to perform all aspects of model-???tting-including variable selection. Therefore, the determination of which model of a given size is best must be made using only the training observations.
+
+
+```{r}
+dim(Hitters)
+set.seed(1)
+```
+
+```{r}
+train = sample(1:263,180, replace=FALSE)
+train
+```
+
+```{r}
+regfit.fwd = regsubsets(Salary~., data=Hitters[train,], method="forward", nvmax=19)
+```
+
+Now we will make predictions for data not used in training There is no predict() method for regsubsets.as we have 19 models we will setup a vector of length 19.
+
+```{r}
+val.errors = rep(NA,19)
+x.test = model.matrix(Salary~., data=Hitters[-train,])
+for(i in 1:19){
+  coefi = coef(regfit.fwd, id=i)
+  pred = x.test[,names(coefi)]%*%coefi
+  val.errors[i] = mean((Hitters$Salary[-train]-pred)^2)
+}
+```
+by[,names(coefi)] in above code we are getting a subset of columns of x.test vector that are part of our coefi vector.
+%*% is doing matrix multiplication with values of coefficients.
+
+
+we can now plot Root MSE errors.
+ 
+```{r}
+plot(sqrt(val.errors), ylab= "Root MSE",ylim = c(300,420), pch=19, type="b")
+```
+
+We also put RSS model on same plot. we removed 1st element of regfit.fwd as 1 element correspond to null model which we have not included in validation errors.
+```{r}
+plot(sqrt(val.errors), ylab= "Root MSE",ylim = c(200,420), pch=19, type="b")
+points(sqrt(regfit.fwd$rss[-1]/180), col="blue", pch=19, type="b" )
+legend("topright", legend=c("training","validation"), col=c("blue", "black"), pch=19)
+```
+RSS decreases monotonically.
+
+we can also write our own function for getting prediction from regsubsets model.
+
+```{r}
+predict.regsubsets = function(object, newdata, id,...){
+  form = as.formula(object$call[[2]])
+  mat = model.matrix(form, newdata)
+  coefi = coef(object,id=id)
+  mat[,names(coefi)]%*%coefi
+}
+```
+
+##Model Selection by Cross Validation-
+we will do 10-fold cross validation.
+```{r}
+set.seed(11)
+folds = sample(rep(1:10,length=nrow(Hitters)))
+folds
+table(folds)
+```
+
+we will create an matrix to store cross validation errors.this matrix will have 10 rows and 19 columns
+```{r}
+cv.errors = matrix(NA,10,19)
+```
+
+```{r}
+for(k in 1:10){
+  best.fit = regsubsets(Salary~., data=Hitters[folds!=k,],nvmax=19, method="forward" )
+  for (i in 1:19){
+    pred = predict(best.fit, Hitters[folds==k,], id=i)
+    cv.errors[k,i] = mean((Hitters$Salary[folds==k]-pred)^2)
+  }
+  
+  }
+```
+
+
+we will use apply() function to average over columns of matrix in order to obtain a vector for which kth element is cross validation error for k-variable model.
+
+```{r}
+rmse.cv = sqrt(apply(cv.errors,2,mean))
+rmse.cv
+```
+we can make a plot of that.
+```{r}
+plot(rmse.cv,pch=19 ,type="b")
+```
+
+##Ridge Regression
+
+
+we will use package glmnet package to perform ridge regression and lasso. This package does not use model formula language, so we will set up an 'x' and 'y'.
+
+```{r}
+x = model.matrix(Salary~., data=Hitters)[,-1]
+y= Hitters$Salary
+```
+
+glmnet() function has an alpha argument to tell which model to fit. 
+alpha=0 for ridge regression model
+alpha=1 for lasso model.
+By default glmnet() function standardizes the variables.
+
+```{r}
+library(glmnet)
+fit.ridge = glmnet(x,y, alpha=0)
+plot(fit.ridge,xvar="lambda", label=TRUE)
+
+```
+There is also a cv.glmnet function that will do cross validation
+```{r}
+cv.ridge = cv.glmnet(x,y,alpha=0)#default k =10
+plot(cv.ridge)
+```
+1st verical line from left indicates minimum error.
+2nd werical line from left indicates 1 standard error away from minimum.
+
+##LASSO
+
+Now we will use lasso regression model, alpha=1
+
+```{r}
+fit.lasso = glmnet(x,y)
+plot(fit.lasso, xvar="lambda", label=TRUE)
+```
+```{r}
+plot(fit.lasso, xvar="dev", label=TRUE)
+```
+
+```{r}
+cv.lasso = cv.glmnet(x,y, alpha=1)
+plot(cv.lasso)
+```
+
+```{r}
+coef(cv.lasso)
+```
+
+
+we can also use validation set approach to select `lambda` for lasso/ridge.
+
+```{r}
+lasso.tr = glmnet(x[train,],y[train], alpha=1)
+lasso.tr
+pred = predict(lasso.tr, x[-train,])
+dim(pred)
+mean((y[-train]-pred)^2)
+```
+
+
+
+```{r}
+rmse = sqrt(apply((y[-train]-pred)^2,2,mean))
+plot(log(lasso.tr$lambda),rmse,type="b", xlab="Log(lambda)")
+
+```
+we can extract best lambda by:
+```{r}
+lam.best = lasso.tr$lambda[order(rmse)[1]]
+lam.best
+coef(lasso.tr, s=lam.best)
+```
+
+
+
+
