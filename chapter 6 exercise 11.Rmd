@@ -1,0 +1,140 @@
+```{r}
+library(MASS)
+library(ISLR)
+```
+
+```{r}
+dim(Boston)
+sum(is.na(Boston))
+```
+so there are no missing values.
+
+**(a)**
+
+Splitting training set and test set.
+```{r}
+train = sample(nrow(Boston),nrow(Boston)*0.7)
+boston.train = Boston[train,]
+boston.test = Boston[-train,]
+```
+
+**Best subset Selection**
+```{r}
+library(leaps)
+
+regfit.full = regsubsets(crim~., data=boston.train )
+reg.summary = summary(regfit.full)
+```
+
+plotting Cp:
+```{r}
+plot(reg.summary$cp, xlab="No.of Variables", ylab="Cp")
+```
+
+cp is minimum for `r which.min(reg.summary$cp)`.
+
+Writing function for predicting using regsubset model:
+
+```{r}
+predict.regsubsets = function(object,newdata,id,...){
+  form = as.formula(object$call[[2]])
+  mat = model.matrix(form,newdata)
+  coefi = coef(object, id=id)
+  mat[,names(coefi)]%*%coefi
+}
+```
+
+we will now use cross validation with 10- folds:
+
+```{r}
+folds = sample(rep(1:10, length=nrow(Boston)))
+
+cv.errors = matrix(NA,10,19)
+ for (k in 1:10){
+   best.fit = regsubsets(crim~. , data=Boston[folds!=k,], nvmax=13)
+   for (i in 1:13){
+    pred = predict(best.fit,Boston[folds==k,], id=i)
+    cv.errors[k,i] = mean((Boston$crim[folds==k]-pred)^2)
+     
+   }
+ }
+```
+
+```{r}
+rmse.cv = sqrt(apply(cv.errors,2,mean))
+```
+in apply(cv.errors,2,mean), 2 indicates function to be applied over columns.
+we will use apply() function to average over columns of matrix in order to obtain a vector for which kth element is cross validation error for k-variable model
+
+```{r}
+plot(rmse.cv, pch=19, type="b")
+```
+```{r}
+which.min(rmse.cv)
+```
+cross validation error is minimum for 9- variable model.
+```{r}
+bestsubset.error = rmse.cv[9]
+```
+
+**LASSO**
+
+```{r}
+library(glmnet)
+
+x = model.matrix(crim~., data=Boston)
+y = Boston$crim
+
+lasso.fit = cv.glmnet(x,y,alpha=1)
+plot(lasso.fit)
+```
+```{r}
+coef(lasso.fit)
+```
+
+```{r}
+lasso.error = sqrt(lasso.fit$cvm[lasso.fit$lambda==lasso.fit$lambda.1se])
+lasso.error
+
+```
+
+cvm refers to cross validated MSE
+**Ridge regression**
+```{r}
+x = model.matrix(crim~., data=Boston)
+y = Boston$crim
+
+ridge.fit = cv.glmnet(x,y,alpha=0)
+plot(ridge.fit)
+```
+```{r}
+coef(ridge.fit)
+```
+
+```{r}
+ridge.error = sqrt(ridge.fit$cvm[ridge.fit$lambda==ridge.fit$lambda.1se])
+ridge.error
+```
+
+
+**PCR**
+
+```{r}
+library(pls)
+
+pcr.fit = pcr(crim~., data=Boston, scale=TRUE, validation="CV")
+validationplot(pcr.fit,val.type="MSEP")
+```
+
+
+```{r}
+which.min(summary(pcr.fit)$adjcv)
+```
+
+fitting pcr on training set and finding error on test set.
+
+```{r}
+pcr.train = pcr(crim~., data=Boston, subset=train, scale=TRUE , validation="CV")
+pcr.pred = predict(pcr.train, Boston[-train,], ncomp=13)
+sqrt(mean((Boston$crim[-train]-pcr.pred)^2))
+```

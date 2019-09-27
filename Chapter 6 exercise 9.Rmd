@@ -1,0 +1,111 @@
+**(a)**
+```{r}
+dim(College)
+sum(is.na(College))
+fix(College)
+```
+```{r}
+set.seed(11)
+train = sample(1:dim(College)[1], dim(College)[1]/2)
+test=-train
+college.train = College[train,]
+college.test = College[test,]
+```
+
+**(b)**
+```{r}
+lm.fit = lm(Apps~.,data=college.train)
+summary(lm.fit)
+lm.pred = predict(lm.fit, newdata=college.test)
+```
+calculating error:
+```{r}
+lm.error = mean((college.test[,"Apps"]-lm.pred)^2)
+lm.error
+```
+
+**(c)**
+```{r}
+library(glmnet)
+```
+
+```{r}
+train.model = model.matrix(Apps~.,data=college.train)
+
+test.model = model.matrix(Apps~., data=college.test)
+```
+
+```{r}
+ridge.fit = cv.glmnet(train.model, college.train[,"Apps"], alpha=0)
+lambda.best = ridge.fit$lambda.min
+lambda.best
+```
+```{r}
+ridge.pred = predict(ridge.fit, newx=test.model, s=lambda.best)
+ridge.error = mean((college.test[,"Apps"]-ridge.pred)^2)
+```
+
+**(d)**
+```{r}
+lasso.fit = cv.glmnet(train.model,college.train[,"Apps"], alpha=1)
+
+lambda.best1 = lasso.fit$lambda.min
+lambda.best1
+```
+
+```{r}
+lasso.pred = predict(lasso.fit, s=lambda.best1, newx = test.model)
+lasso.error = mean((college.test[,"Apps"]-lasso.pred)^2)
+```
+
+The coefficients are given by:
+
+```{r}
+lasso.model = glmnet(model.matrix(Apps~., data=College),College[,"Apps"], alpha=1)
+predict(lasso.model, s=lambda.best1, type="coef")
+```
+
+**(e)**
+
+```{r}
+library(pls)
+pcr.fit = pcr(Apps~., data=college.train, scale=TRUE, validation="CV")
+summary(pcr.fit)
+```
+
+plotting validation error:
+
+```{r}
+validationplot(pcr.fit, val.type="MSEP")
+```
+using M=10. finding test error:
+
+```{r}
+pcr.pred = predict(pcr.fit, college.test, ncomp=10)
+pcr.error = mean((college.test[,"Apps"]-pcr.pred)^2)
+pcr.error
+```
+
+**(f)**
+```{r}
+pls.fit = plsr(Apps~., data=college.train, scale=TRUE, validation="CV")
+validationplot(pls.fit, val.type = "MSEP")
+```
+
+```{r}
+summary(pls.fit)
+```
+ using M=6:
+ 
+```{r}
+pls.pred = predict(pls.fit,college.test, ncomp=6)
+pls.error = mean((college.test[,"Apps"]-pls.pred)^2)
+pls.error
+```
+ 
+ Now we will plot the error to compare results:
+```{r}
+errors = rbind(lm.error,ridge.error,lasso.error,pcr.error,pls.error)
+plot(errors,type="b",ylim= c(1000000,2000000))
+text(x=1:5,y=errors,labels=c("lm","ridge","lasso","pcr","pls"),cex=0.9,pos=3)
+```

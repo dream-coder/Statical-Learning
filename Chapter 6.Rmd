@@ -14,7 +14,6 @@ Hitters  = na.omit(Hitters)
 sum(is.na(Hitters$Salary))
 ```
 ##Best Subset Regression:
--------------------------
 Best subset selection is performed using regsubsets() function which is part of leaps library.
 
 ```{r}
@@ -245,5 +244,68 @@ coef(lasso.tr, s=lam.best)
 ```
 
 
+##PCR and PLS regression
 
+###Principal Components Regression
+```{r}
+library(pls)
+set.seed(2)
+pcr.fit = pcr(Salary~., data=Hitters, scale=TRUE, validation="CV")
+```
+syntax of pcr() function is similar to that of lm(); setting scale=TRUE standardize each variable.
+setting validation="CV" causes pcr() to compute ten-fold cross validation error for each possible value of number of principal components used.
+```{r}
+summary(pcr.fit)
+```
 
+comps correspond to no. of principal componenets used. 
+
+`pcr()` reports the root mean squared error.To get usual MSE we need to square the error.
+
+We can also plot the cross validation scores using the `validationplot()` function. using argument `val.type="MSEP"` will plot cross validation MSE.
+
+```{r}
+validationplot(pcr.fit,val.type="MSEP")
+```
+`summary()` also provides percentage of variance explained in predictors and reponse explained by different number of components.
+setting M = 1 only captures 38.31% of all the variance, or information, in the predictors. In contrast, using M = 6 increases the value to 88.63%. If we were to use all M = p = 19 components, this would increase to 100%. 
+
+performing PCR on training data.
+```{r}
+set.seed(1)
+pcr.fit = pcr(Salary~., data=Hitters, subset=train, scale=TRUE, validation="CV")
+validationplot(pcr.fit, val.type="MSEP")
+```
+finding test MSE when M=7 components are used.
+
+```{r}
+pcr.pred = predict(pcr.fit,Hitters[-train,], ncomp=7)
+mean((pcr.pred-Hitters$Salary[-train])^2)
+```
+```{r}
+pcr.fit1 = pcr(y~x, scale=TRUE, ncomp=7)
+summary(pcr.fit1)
+```
+
+###Partial Least Squares
+
+we can perform partial least squares regression using the `plsr()` function, part of pls library.
+
+```{r}
+set.seed(1)
+pls.fit = plsr(Salary~., data=Hitters, subset=train, scale=TRUE, validation="CV")
+summary(pls.fit)
+```
+lowest cross validation error occurs when M=3 partial least squares direction are used.
+
+```{r}
+pls.pred = predict(pls.fit,x[-train,], ncomp=3)
+mean((pls.pred-y[-train])^2)
+```
+we can also perform PLS using full data set, using M=2.
+
+```{r}
+pls.fit1 = plsr(Salary~., data=Hitters, scale=TRUE, ncomp=3)
+summary(pls.fit1)
+```
+Notice that the percentage of variance in Salary that the two-component PLS ???t explains, 46.40%, is almost as much as that explained using the ???nal seven-component model PCR ???t, 46.69%. This is because PCR only attempts to maximize the amount of variance explained in the predictors, while PLS searches for directions that explain variance in both the predictors and the response.

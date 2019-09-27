@@ -1,0 +1,123 @@
+**(a)**
+
+```{r}
+set.seed(1)
+p=20
+n=1000
+x = matrix(rnorm(n*p),n,p)
+B= rnorm(p)
+B[3] = 0
+B[5] = 0
+B[6] = 0
+B[10] = 0
+B[18] = 0
+eps = rnorm(n)
+y = x%*%B + eps
+```
+
+**(b)**
+```{r}
+train = sample(1:dim(x)[1],100)
+x.train = x[train,]
+y.train = y[train,]
+x.test = x[-train,]
+y.test = y[-train,]
+```
+
+**(c)**
+```{r}
+library(leaps)
+regfit.full = regsubsets(y ~ . , data = data.frame(x=x.train, y=y.train), nvmax=p)
+summary(regfit.full)
+```
+
+Now, we will make predictions on training set.
+
+```{r}
+val.errors=rep(NA,20)
+train.mat = model.matrix(y~.,data=data.frame(x=x.train,y=y.train))
+for(i in 1:20){
+  coefi = coef(regfit.full, id = i)
+  pred = train.mat[,names(coefi)]%*%coefi
+  val.errors[i] = mean((y.train-pred)^2)
+}
+```
+plotting the training error:
+
+```{r}
+plot(val.errors, xlab="No. of predictors", ylab="Training MSE", type="b", pch=19)
+```
+
+**(d)**
+
+```{r}
+x_cols = colnames(x, do.NULL=F, prefix = "x.")
+x_cols
+```
+
+```{r}
+test.mat = model.matrix(y~., data = data.frame(x=x.test, y=y.test))
+val.errorstest = rep(NA,20)
+```
+
+
+```{r}
+for(i in 1:20){
+  coefi = coef(regfit.full, id=i)
+  pred = as.matrix(x.test[, x_cols %in% names(coefi)]) %*% coefi[names(coefi) %in% 
+        x_cols]
+  val.errorstest[i] = mean((y.test-pred)^2)
+}
+```
+
+```{r}
+plot(val.errorstest, type="b",pch=19)
+```
+
+
+**(e)**
+test error is minimum for which size.
+
+```{r}
+which.min(val.errorstest)
+```
+
+**(f)**
+```{r}
+coef.best = coef(regfit.full, id=19)
+coef.best
+```
+
+comparing coefficients:
+
+```{r}
+names(B) = paste0("x.",1:20)
+merge(data.frame(beta=names(B),B),data.frame(beta=names(coef.best),coef.best),all.x=T, sort=F)
+```
+
+
+**(g)**
+we will find error between estimated nad true coefficients.
+
+
+```{r}
+val.errors = rep(NA,20)
+a = rep(NA,20)
+b = rep(NA,20)
+for (i in 1:20){
+  coefi = coef(regfit.full, id=i)
+  a[i] = length(coefi)-1
+  b[i] = sqrt(sum((B[x_cols %in% names(coefi)] - coefi[names(coefi) %in% x_cols])^2) + 
+  sum(B[!(x_cols %in% names(coefi))])^2)
+}
+```
+plotting the errors:
+
+```{r}
+plot(x=a, y=b, xlab="Number of coefficients", ylab="error between estimated and true coefficients")
+
+```
+```{r}
+which.min(b)
+```
+model with `r which.min(b)` coefficients minimizes the error between estimated and true coefficients, while test error is minimized with `r which.min(val.errorstest)`.

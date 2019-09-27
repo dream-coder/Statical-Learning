@@ -1,0 +1,180 @@
+##Question NO.8
+**(a)**
+Generating simulated data.
+```{r}
+x = rnorm(100)
+eps = rnorm(100,0,0.125)
+```
+
+**(b)**
+
+Generating a response vector Y.
+
+```{r}
+y = -1 + 0.4*x-0.9*x^2+1.6*x^3+eps
+```
+
+**(c)**
+
+```{r}
+library(leaps)
+dataset = data.frame(cbind(x,y))
+reg.full = regsubsets(y~poly(x,10, raw=T), data= dataset)
+reg.summary = summary(reg.full)
+reg.summary
+```
+
+**Important Point**
+Why using raw=T argument:
+There are 2 types of polynomial:- Raw and Orthogonal.
+
+In the raw coding you can only interpret the p-value of x if x^2 remains in the model. And as both regressors are highly correlated one of them can be dropped. However, in the orthogonal coding x^2 only captures the quadratic part that has not been captured by the linear term. And then it becomes clear that the linear part is significant while the quadratic part has no additional significance. 
+
+We will be using raw polynomial as our variables are highly correlated.
+
+```{r}
+which.min(reg.summary$cp)
+which.max(reg.summary$adjr2)
+```
+```{r}
+plot(reg.summary$cp, xlab="No. of Variables", ylab="Cp")
+points(4,reg.summary$cp[4], col="red", pch=19)
+```
+```{r}
+plot(reg.summary$adjr2, type="b")
+points(6,reg.summary$adjr2[6], col="red", pch=19)
+
+```
+
+
+
+coefficients for p=5:
+```{r}
+coef(reg.full,5)
+```
+
+**(d)**
+
+Using forward selection:
+
+```{r}
+reg.fwd = regsubsets(y~poly(x,10, raw=T), data=dataset, method="forward")
+regfwd.summary  = summary(reg.fwd)
+
+```
+
+
+```{r}
+which.min(regfwd.summary$cp)
+which.max(regfwd.summary$adjr2)
+which.min(regfwd.summary$bic)
+```
+using backward selection:
+```{r}
+reg.bwd = regsubsets(y~poly(x,10, raw=T), data = dataset, method="backward")
+regbwd.summary = summary(reg.bwd)
+which.min(regbwd.summary$cp)
+which.max(regbwd.summary$adjr2)
+which.min(regbwd.summary$bic)
+```
+
+```{r}
+coefficients(reg.full, id=5)
+```
+```{r}
+coefficients(reg.fwd, id=3)
+```
+```{r}
+coefficients(reg.bwd, id=3)
+```
+
+**(e)**
+making model matrix of X.
+```{r}
+library(glmnet)
+xmat = model.matrix(y~poly(x,10, raw=T), data=dataset)[,-1]
+```
+
+
+
+fitting lasso:
+
+```{r}
+lasso.fit = cv.glmnet(xmat,y, alpha=1)
+best.lambda = lasso.fit$lambda.min
+best.lambda
+```
+
+```{r}
+plot(lasso.fit)
+
+```
+
+```{r}
+best.model = glmnet(xmat,y, alpha=1)
+predict(best.model, s=best.lambda, type="coefficients")
+```
+
+
+```{r}
+plot(best.model)
+```
+
+**(f)**
+generating a response vector Y:
+```{r}
+y = -1 + 7*x^7 + eps
+data.full = data.frame(cbind(x,y))
+```
+
+**best subset selection**
+```{r}
+reg.full1 = regsubsets(y~poly(x,10,raw=T), data=data.full)
+regfull1.summary = summary(reg.full1)
+```
+
+finding the best model:
+```{r}
+which.min(regfull1.summary$cp)
+```
+```{r}
+which.min(regfull1.summary$bic)
+```
+```{r}
+which.max(regfull1.summary$adjr2)
+```
+
+```{r}
+coefficients(reg.full1, id=4)
+```
+
+```{r}
+coefficients(reg.full1, id=1)
+```
+```{r}
+coefficients(reg.full1, id=6)
+```
+
+we can see that bic picks up most accurate 1- variable model. other criteria pick additional variable model.
+
+now fitting lasso:
+
+```{r}
+xmat = model.matrix(y~poly(x,10,raw=T), data= data.full)[,-1]
+```
+
+```{r}
+lasso.fit1 = cv.glmnet(xmat,y, alpha=1)
+```
+Selecting best model:
+```{r}
+best.lambda1 = lasso.fit1$lambda.min
+best.lambda1
+```
+ now fitting best model:
+```{r}
+best.model = glmnet(xmat,y,alpha=1)
+predict(best.model, s=best.lambda1, type="coef")
+```
+
+
