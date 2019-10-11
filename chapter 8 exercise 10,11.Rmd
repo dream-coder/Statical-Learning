@@ -1,0 +1,128 @@
+**Question No.10**
+
+**(a)**
+
+```{r}
+library(MASS)
+library(ISLR)
+library(randomForest)
+library(tree)
+set.seed(102)
+```
+
+finding out the NA values is salary column
+```{r}
+sum(is.na(Hitters$Salary))
+```
+Removing the rows which has salary information in unknown
+```{r}
+Hitters = Hitters[-which(is.na(Hitters$Salary)),]
+dim(Hitters)
+```
+Now, applying log transformation:
+```{r}
+Hitters$Salary = log(Hitters$Salary)
+```
+
+**(b)**
+
+```{r}
+train = sample(1:dim(Hitters)[1], 200)
+```
+
+**(c)**
+
+
+```{r}
+library(gbm)
+```
+We will generate different values of lambda to supply in gradient boosting. 
+
+```{r}
+pows = seq(-10,-0.2, by= 0.1)
+lambda = 10^pows
+err.test = rep(NA,length(lambda))
+err.train = rep(NA, length(lambda))
+for (i in 1:length(lambda)){
+  
+  boost.hitters = gbm(Salary~. , data= Hitters[train,], distribution = "gaussian", n.trees = 1000, shrinkage = lambda[i])
+  pred.train = predict(boost.hitters, newdata = Hitters[train,], n.trees = 1000)
+  err.train[i] = mean((Hitters[train,]$Salary - pred.train)^2)
+  pred.test = predict(boost.hitters, newdata = Hitters[-train,], n.trees = 1000)
+  err.test[i] = mean((Hitters[-train,]$Salary - pred.test)^2)
+}
+```
+Now, we will plot the errors:
+
+
+```{r}
+plot(lambda,err.train, col="blue", xlab="lambda")
+lines(lambda,err.test, col="green")
+
+```
+
+```{r}
+min(err.test)
+lambda[which.min(err.test)]
+```
+Minimum test error is obtained when $\lambda$ = 0.15.
+
+**(e)**
+
+```{r}
+lm.fit = lm(Salary~. , data= Hitters, subset= train)
+lm.pred = predict(lm.fit, newdata = Hitters[-train,])
+err.lm = mean((Hitters[-train,]$Salary - lm.pred)^2)
+err.lm
+```
+We will fit lasso model to data
+```{r}
+library(glmnet)
+
+x.train = model.matrix(Salary~., data= Hitters[train,])
+y = Hitters[train,]$Salary
+x.test = model.matrix(Salary~. , data= Hitters[-train,])
+
+lasso.fit = glmnet(x.train,y, alpha=1)
+lasso.pred = predict(lasso.fit, newx = x.test)
+err.lasso = mean((Hitters[-train,]$Salary - lasso.pred)^2)
+err.lasso
+
+```
+Both linear regression and lasso has higher error rate than boosting.
+```{r}
+importance(boost.hitters)
+```
+
+**(e)**
+
+```{r}
+best.boost = gbm(Salary~. , data= Hitters[train,], n.trees = 1000, shrinkage = lambda[which.min(err.test)], distribution = "gaussian")
+```
+
+```{r}
+summary(best.boost)
+```
+We can see that CAtBat, CRuns, CRBI are 3 most important variables.
+
+**(g)**
+
+```{r}
+bag.salary = randomForest(Salary~. , data= Hitters, subset= train, mtry= dim(Hitters)[2]-1, ntree= 500)
+pred.bag = predict(bag.salary, newdata = Hitters[-train,])
+mean((Hitters[-train,]$Salary - pred.bag)^2)
+```
+
+**Question no.- 11**
+
+**(a)**
+```{r}
+train = 1:1000
+Caravan$Purchase = ifelse(Caravan$Purchase == "Yes",1,0)
+```
+
+```{r}
+library(gbm)
+boost.caravan = gbm(Purchase~. , data= Caravan[train,], n.trees = 1000, shrinkage = 0.01, )
+
+

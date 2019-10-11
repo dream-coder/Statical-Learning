@@ -1,0 +1,256 @@
+**Question no.-8**
+
+```{r}
+library(ISLR)
+library(MASS)
+library(tree)
+attach(Carseats)
+dim(Carseats)
+set.seed(101)
+```
+**(a)**
+using training set of 250 observations and test set of 150 observations. 
+
+```{r}
+train = sample(1:nrow(Carseats),250)
+```
+
+**(b)**
+```{r}
+tree.carseats = tree(Sales~.-Sales,data= Carseats, subset= train)
+summary(tree.carseats)
+```
+```{r}
+plot(tree.carseats)
+```
+
+```{r}
+tree.pred = predict(tree.carseats, Carseats[-train,])
+err.dt = mean((Carseats[-train,]$Sales - tree.pred)^2)
+err.dt
+```
+
+test mse is about = 4.722
+
+**(c)**
+
+
+```{r}
+tree.cs = cv.tree(tree.carseats)
+tree.cs
+```
+
+ 
+plotting the error:
+```{r}
+plot(tree.cs$size, tree.cs$dev, type="b", ylab="cross validation error", xlab="no. of variables in tree")
+```
+tree of size 11 is giving least cross validation error.
+
+```{r}
+pruned.carseats = prune.tree(tree.carseats, best = 11)
+plot(pruned.carseats)
+text(pruned.carseats, pretty = 0)
+```
+
+```{r}
+pred.pruned = predict(pruned.carseats, newdata = Carseats[-train,])
+err.cv = mean((Carseats[-train,]$Sales - pred.pruned)^2)
+err.cv
+err.dt
+```
+pruning the tree has increases the test MSE to 4.99
+
+**(d)**
+we can do bagging `randomForest()` by using `mtry` as all variables.
+
+```{r}
+
+bag.carseats = randomForest(Sales~. , data= Carseats, subset= train, importance = TRUE, mtry = dim(Carseats)[2]-1)
+bag.carseats
+```
+
+```{r}
+pred.bag = predict(bag.carseats, newdata = Carseats[-train,])
+err.bag = mean((Carseats[-train,]$Sales - pred.bag)^2)
+err.bag
+err.cv
+err.dt
+```
+bagging improves the MSE to 2.49
+```{r}
+importance(bag.carseats)
+```
+
+price, shelveloc, age, compPrice are variables which are most important.
+
+**(e)**
+
+```{r}
+rf.carseats = randomForest(Sales~.-Sales , data= Carseats, subset= train, importance = TRUE )
+rf.carseats
+```
+```{r}
+pred.rf = predict(rf.carseats, newdata = Carseats[-train,])
+err.rf = mean((Carseats[-train,]$Sales - pred.rf)^2)
+err.rf
+```
+determing importance of variables:
+
+```{r}
+rf.carseats$importance
+```
+Price, Shelveloc, Age are three most important variables.
+
+Now, we will determine effect of `mtry` on test error rate:
+total variables excluding sales = `rdim(Carseats)[2]-1`
+
+```{r}
+err = rep(NA,10) 
+for(k in 1:10){
+  rf.carseats = randomForest(Sales~.-Sales , data= Carseats, subset= train, mtry= k )
+  pred = predict(rf.carseats, newdata = Carseats[-train,])
+  err[k] = mean((Carseats[-train,]$Sales - pred)^2)
+}
+err
+```
+
+we can also plot the errors:
+```{r}
+plot(err)
+```
+We can see that afterwards model with `mtry = 5`, the error rate is not much changing.
+
+
+we will also plot the errors obtained from different models.
+
+```{r}
+error = c(err.dt,err.cv, err.bag, err.rf)
+plot(error, xlim = c(1,5))
+text(error,label=c("simple","cross validated prune","bagging", "random forest"), cex= 0.7, pos=4)
+```
+bagging gives best results.
+
+
+**Question No.-9 **
+
+```{r}
+library(ISLR)
+library(MASS)
+library(tree)
+library(randomForest)
+attach(OJ)
+set.seed(1001)
+dim(OJ)
+```
+**(a)**
+creating a train variable containing 800 random indexes
+
+```{r}
+train = sample(1:dim(OJ)[1], 800)
+```
+
+**(b)**
+
+```{r}
+tree.oj = tree(Purchase~. , data= OJ, subset= train)
+summary(tree.oj)
+```
+Tree only used two variables.
+training error rate = 0.16
+terminal nodes = 8
+
+```{r}
+plot(tree.oj)
+text(tree.oj, pretty=0)
+```
+
+**(c)**
+
+```{r}
+tree.oj
+
+```
+let's pick variable 11.
+11) PriceDiff > 0.31 49   66.920 CH ( 0.57143 0.42857 ) *
+
+
+1. Splitting variable at this node is `PriceDiff`. The splitting value is 0.31.
+2. There are 49 data points in subtree below this node. 
+3. The deviance of all points contained in region below this node is 66.920
+4. * indicates it is a terminal node.
+5. prediction at this node is sales = CH
+6. about 57% of points in this node CH values of sales.
+
+**(d)**
+
+```{r}
+plot(tree.oj)
+text(tree.oj, pretty=0)
+```
+
+`LoyalCh` is the most important variable. as top 3 nodes contain `LoyalCh`.
+
+**(e)**
+
+```{r}
+pred.tree = predict(tree.oj, newdata = OJ[-train,], type="class")
+table(OJ[-train,"Purchase"],pred.tree)
+```
+
+```{r}
+err.test = (23+31)/length(pred.tree)
+err.test
+```
+ **(f)**
+ 
+```{r}
+ojtree.cv = cv.tree(tree.oj, FUN= prune.misclass)  
+ojtree.cv
+```
+
+Tree with 7 terminal nodes gives lowest cross-validation error rate.
+
+**(g)**
+
+```{r}
+plot(ojtree.cv$size, ojtree.cv$dev, type="b")
+```
+ **(h)**
+ tree size = 7 corresponds to lowest cross-validated classification error rate.
+ 
+ **(i)**
+ 
+```{r}
+tree.pruned = prune.tree(tree.oj, best=7)
+summary(tree.pruned)
+plot(tree.pruned)
+text(tree.pruned, pretty=0)
+```
+ 
+ **(j)**
+ 
+```{r}
+errtrain.tree = summary(tree.oj)$mis[1]/summary(tree.oj)$mis[2]
+
+errtrain.pruned = summary(tree.pruned)$mis[1]/summary(tree.pruned)$mis[2]
+errtrain.tree
+errtrain.pruned
+```
+Pruned tree has higher training error.
+
+**(k)**
+
+
+```{r}
+pred.tree = predict(tree.oj, newdata = OJ[-train,])
+errtest.tree = sum(OJ[-train,] != pred.tree)/length(pred.tree)
+
+pred.pruned = predict(tree.pruned, newdata = OJ[-train,])
+errtest.pruned  = sum(OJ[-train,] != pred.pruned)/length(pred.pruned)
+
+errtest.tree
+errtest.pruned
+```
+
+

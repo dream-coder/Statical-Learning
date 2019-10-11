@@ -1,0 +1,69 @@
+**Question No.-7**
+
+We will try with no. of trees from 1 to 500 and m= $p$, $\frac{p}{2}$, $\sqrt{p}$.
+
+we will make training set and test set to calculate errors:
+
+```{r}
+library(ISLR)
+library(MASS)
+library(randomForest)
+attach(Boston)
+```
+
+```{r}
+dim(Boston)
+```
+
+Now we will be using 300 observations as training data set and others as test data set.
+
+```{r}
+train = sample(1:nrow(Boston), 300)
+boston.test = Boston[-train,]
+```
+
+No we will define different P,
+```{r}
+p = dim(Boston)[2]-1
+p.2 = p/2
+p.sq = sqrt(p)
+```
+
+Now, for getting error for every tree, we need to write loop:
+
+```{r}
+
+mse.p = rep(NA,50)
+mse.p2 = rep(NA,50)
+mse.psq = rep(NA,50)
+  for( k in seq(1,500,10)){
+    rf = randomForest(medv~., data= Boston, mtry=p, ntree=k)
+    pred = predict(rf, newdata = Boston[-train,])
+    mse.p[k] = mean((boston.test$medv - pred)^2)
+  }
+
+for( k in seq(1,500,10)){
+    rf = randomForest(medv~., data= Boston, mtry=p.2, ntree=k)
+    pred = predict(rf, newdata = Boston[-train,])
+    mse.p2[k] = mean((boston.test$medv - pred)^2)
+}
+
+for( k in seq(1,500,10)){
+    rf = randomForest(medv~., data= Boston, mtry=p.sq, ntree=k)
+    pred = predict(rf, newdata = Boston[-train,])
+    mse.psq[k] = mean((boston.test$medv - pred)^2)
+}
+
+
+```
+
+
+Now we will plot the errors:
+```{r}
+plot(1:50, mse.p, col="blue", type="l", ylab ="TEST MSE", xlab = "No. of Trees")
+lines(1:50,mse.p2, col="red", type="l")
+lines(1:50,mse.psq, col="green", type="l")
+legend("topright", legend = c("p","p.2","p.sq"), col=c("blue", "red","green"), lty = 1)
+
+```
+we can see that model with p/2 variables is giving lowest error.
