@@ -1,0 +1,244 @@
+---
+title: "Chapter 9 question 4,5"
+author: "Mukul Goyal"
+date: "October 22, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Question 4
+
+
+
+```{r}
+set.seed(191)
+x = rnorm(100)
+y = 3 * x^2 + 4 + rnorm(100)
+train = sample(100,50)
+y[train] = y[train] + 3
+y[-train] = y[-train] - 3
+plot(x[train], y[train], pch="+", lwd=4, col="red", ylim = c(-5,25), xlim=c(-2,2))
+points(x[-train], y[-train], pch="o", lwd=4, col="blue")
+
+```
+
+We will now create a new vector `z` for classes, which will contain 0 and 1 according to classes.
+
+```{r}
+z = rep(0,100)
+z[train] = 1
+#take 25 observation each from train and -train
+#setdiif is used to take difference between index positions 1:100 and train.
+final.train = c(sample(train,25), sample(setdiff(1:100, train),25))
+
+data.train = data.frame(x = x[final.train], y= y[final.train], z= as.factor(z[final.train]))
+
+
+data.test = data.frame(x= x[-final.train], y= y[-final.train], z=as.factor(z[-final.train]))
+
+```
+
+First we will fit support vector classifier.
+
+
+```{r}
+svm.linear = svm(z~. , data= data.train, kernel= "linear", cost=10)
+plot(svm.linear, data.train)
+```
+
+We can now get mis-classification table:
+
+```{r}
+table1 = table(z[final.train], predict(svm.linear, data.train))
+table1
+```
+Mis- classification rate:
+```{r}
+(table1[2] + table1[3])/50
+```
+Now, we will train SVM with polynomial kernel:
+```{r}
+svm.poly = svm(z~. , data= data.train, kernel="polynomial", cost=10)
+plot(svm.poly, data.train)
+```
+Mis- classification rate with polynomial kernel:
+```{r}
+table1 = table(z[final.train], predict(svm.poly, data.train))
+table1
+```
+```{r}
+(table1[2] + table1[3])/50
+```
+We will now try SVM with radial kernel.
+
+```{r}
+svm.radial = svm(z~., data= data.train, kernel="radial", gamma= 1, cost=10)
+plot(svm.radial, data.train)
+```
+
+Now, checking mis-classification rate:
+```{r}
+table1 = table(z[final.train], predict(svm.radial,data.train))
+table1
+```
+
+```{r}
+(table1[2] + table1[3])/50
+```
+Lowest error rate for radial SVM.
+
+now checking for test data
+
+1. Support vector classifier
+
+```{r}
+table1 = table(z[-final.train], predict(svm.linear, data.test))
+table1
+```
+```{r}
+(table1[2] + table1[3])/50
+```
+
+2. SVM- Polynomial
+
+```{r}
+table1 = table(z[-final.train], predict(svm.poly, data.test))
+table1
+```
+Mis- classification error rate
+```{r}
+(table1[2] + table1[3])/50
+```
+3. Radial SVM
+
+```{r}
+table1 = table(z[-final.train], predict(svm.radial, data.test))
+table1
+```
+
+```{r}
+(table1[2] + table1[3])/50
+```
+
+Radial gives lowest test error rate.
+
+
+#Question 5
+
+
+```{r}
+set.seed(99)
+x1 = runif(500)-0.5
+x2 = runif(500)-0.5
+y = 1*(x1^2 - x2^2 > 0)
+```
+
+```{r}
+plot(x1,x2, pch=19, col=y+3)
+```
+
+```{r}
+data.sim = data.frame(x1=x1,x2=x2, y=y)
+```
+
+```{r}
+train = sample(500,300)
+```
+
+```{r}
+library(glmnet)
+log.reg = glm(y~., data= data.sim[train,], family="binomial")
+summary(log.reg)
+```
+
+
+```{r}
+prob = predict(log.reg, newdata = data.sim, type="response")
+lm.pred = ifelse(prob>0.5,1,0)
+plot(data.sim[lm.pred==1,]$x1,data.sim[lm.pred==1,]$x2 ,col="blue", xlab="X1", ylab="X2", pch= "+")
+points(data.sim[lm.pred==0,]$x1,data.sim[lm.pred==0,]$x2 ,col="green", pch= "x")
+
+```
+We can see from above that decision boundary is linear.
+
+Now, we will be fitting logistic regression using non-linear functions of X.
+
+```{r}
+log.1 = glm(y~ x1+I(x1^2)+x2, family = "binomial", data= data.sim)
+summary(log.1)
+```
+
+We can see that polynomial term of x1 is significant as seen by p- value.
+
+Checking other model:
+
+```{r}
+log.2 = glm(y~ I(x1^2)+I(x1*x2), family = "binomial", data= data.sim)
+summary(log.2)
+```
+x1*x2 term is not significant
+
+Checking other model:
+
+```{r}
+log.3 = glm(y~ I(x1^2)+I(x2^2), family = "binomial", data= data.sim)
+summary(log.3)
+```
+
+Not much of value.
+
+Checking other model:
+
+```{r}
+log.4 = glm(y~ I(x1^2)+log(x2)+x2, family = "binomial", data= data.sim)
+summary(log.4)
+```
+All terms of this model seems significant.
+Using above model.
+
+```{r}
+prob = predict(log.3, newdata = data.sim, type="response")
+lm.pred = ifelse(prob>0.5,1,0)
+plot(data.sim[lm.pred==1,]$x1,data.sim[lm.pred==1,]$x2 ,col="blue", xlab="X1", ylab="X2", pch= "+")
+points(data.sim[lm.pred==0,]$x1,data.sim[lm.pred==0,]$x2 ,col="green", pch= "x")
+```
+
+Model with $x_{1}^2$ and $x_{2}^2$ term gives non- linear boundary and closely resemble to true decision boundary.
+
+Fitting a support vector classifier to the model
+```{r}
+library(e1071)
+```
+
+```{r}
+svc = svm(as.factor(y)~ x1 + x2 , data = data.sim, kernel = "linear", cost= 10)
+svc.pred =  predict(svc, data.sim)
+plot(data.sim[svc.pred==1,]$x1,data.sim[svc.pred==1,]$x2 ,col="blue", xlab="X1", ylab="X2", pch= "+")
+points(data.sim[svc.pred==0,]$x1,data.sim[svc.pred==0,]$x2 ,col="green", pch= "x")
+```
+A support vector classofier gives a linear boundary.
+
+
+We will now fit SVM using a non linear kernel:
+
+```{r}
+svm.radial = svm(as.factor(y)~., data = data.sim, kernel = "radial", gamma=1, cost=1)
+svm.pred =  predict(svm.radial, data.sim, type="class")
+plot(data.sim[svm.pred==1,]$x1,data.sim[svm.pred==1,]$x2 ,col="blue", xlab="X1", ylab="X2", pch= "+")
+points(data.sim[svm.pred==0,]$x1,data.sim[svm.pred==0,]$x2 ,col="green", pch= "x")
+```
+
+
+Produces a decision boundary close to true decision boundary.
+
+
+We can see that logistic regression with non-linear terms and Support vector classifier does not do well with dataset having non-linear decision boundary. 
+But including non linear term and interaction term in logistic regression gives non-linear decision boundary close to true decision.
+SVM with radial kernel also gives non-linear boundary.
+We can say that with logistic regression we will have to try combinations of the formula before finding the actual one. Whereas in SVM with radial kernel, we can easily get result.
+
+
+

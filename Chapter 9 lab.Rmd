@@ -1,0 +1,249 @@
+---
+title: "Chapter 9 lab"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+##Linear SVM Classifier
+
+
+
+We are going to generate a simulated data.
+
+
+```{r}
+set.seed(101)
+x = matrix(rnorm(40),20,2)
+y = rep(c(-1,1), c(10,10))
+```
+
+We are moving the mean from 0 to 1 in `x` for index positions in `y` having `y=1`.
+```{r}
+x[y=1,] = x[y=1,]+1
+plot(x,col=y+3,pch=19)
+```
+
+Now we will load the package.
+The `svm()` function in   `e1071` library can be used to fit support vector classifier when argument `kernel = linear` is used.
+
+`cost` argument allows us to specify the cost of violation to margin.
+
+When `cost` argument is small, then the margins will be wide and many data points(support vector) will be on wrong side of margin whereas when `cost` argument is large margins will be narrow and few support vectors will be on margin or violating the margin.
+
+```{r}
+library(e1071)
+dat = data.frame(x,y = as.factor(y))
+svmfit = svm(y~., data= dat, kernel="linear", cost=10, scale=FALSE)
+print(svmfit)
+```
+```{r}
+plot(svmfit,dat)
+```
+Noting that `X1` in on y- axis and `X2` on x- axis
+in contrast to usual plot function.
+support vectors are plotted as `X` where remaining observations as `o`.
+
+We can obtain the identity of support vectors.
+```{r}
+svmfit$index
+```
+
+We can also make our own plot for support vector.
+Forst thing we will make a grid of values for `X1` and `X2`
+
+We will use function `expand.grid` and produce the coordinates of `n*n` points on a lattice covering whole domain of `x`. Having made the lattice, we can make prediction at each point on lattice and then plot the lattice, color - coded according to classification. We can then see the the decision boundary.
+
+We will be constructing a function `make.grid` with arguments as data matrix `x` and no. of points in each direction.
+
+```{r}
+make.grid=function(x,n=75){
+  grange = apply(x,2,range) #grange will contain range of each column of x; 2 indicates apply over column
+  x1 = seq(from=grange[1,1], to= grange[2,1], length= n)
+  x2 = seq(from= grange[1,2], to= grange[2,2], length = n)
+  expand.grid(X1=x1, X2=x2) #this function takes the uniformly spaced x1 and x2 and makes a lattice
+}
+```
+
+
+```{r}
+xgrid = make.grid(x)
+ygrid = predict(svmfit,xgrid)
+plot(xgrid, col=c("red","blue")[as.numeric(ygrid)], pch=20, cex=0.2)
+
+```
+Now, we will put our original points on this plot:
+
+```{r}
+plot(xgrid, col= c("red","blue")[as.numeric(ygrid)], pch=20, cex=0.2)
+points(x, col=y+3, pch=19)
+points(x[svmfit$index,], pch=5, cex=2)
+```
+
+We can use a inbuilt function `tune()` in `e1071` library to perform cross validation to select `cost` parameter. 
+In order to use this function, we need to pass relevant information about set of models that are in considersation.
+By default, `tune()` performs 10-fold cross validation.
+
+```{r}
+tune.out = tune(svm,y~., data= dat, kernel = "linear", ranges  = list(cost=c(0.001,0.01,0.1,1,5,10,100)))
+```
+
+```{r}
+summary(tune.out)
+```
+`cost=5` results in lowest cross validation error.
+
+Best model could be accessed through:-
+```{r}
+bestmod = tune.out$best.model
+summary(bestmod)
+```
+
+It's not easy in `svm()` to getl linear coefficients.
+
+```{r}
+beta = drop(t(svmfit$coefs)%*%x[svmfit$index,])
+beta0 = svmfit$rho
+plot(xgrid, col=c("red","blue")[as.numeric(ygrid)], pch=20, cex=0.2)
+points(x, col= y+3, pch=19)
+points(x[svmfit$index,], pch=5, cex=2)
+abline(beta0/beta[2], -beta[1]/beta[2]) #first argument is intercept of decision boundary and second one is slope of it.
+#now plotting margins
+abline(beta0-1/beta[2], -beta[1]/beta[2]) #intercept will change, slope will be same.
+abline(beta0+1/beta[2], -beta[1]/beta[2])
+```
+
+##Non- Linear SVM Classifier
+
+To fit an SVM using an non-linear kernel, we can use the `svm()` function with different value of `kernel` argument. 
+
+To fit an SVM with polynomial kernel we can use `kernel=ploynomial` and for radial, `kernel=radial`.
+
+In polynomial kernel, we use `degree` argument to specify adegree for polyomial.
+
+In radial kernel, we use `gamma` argument to specify value of $\gamma$.
+
+
+We will Use mixture data set from ESLR data sets.
+```{r}
+library(e1071)
+load(url("http://www.stanford.edu/~hastie/ElemStatLearn/datasets/ESL.mixture.rda"))
+names(ESL.mixture)
+rm(x,y)
+attach(ESL.mixture)
+dat = data.frame(x,y = as.factor(y))
+```
+
+```{r}
+plot(x, col=y+1)
+```
+
+From above plot we can see that class boundary is non-linear.
+
+Fitting SVM using `svm()` function with radial kernel and $\gamma = 1$.
+
+```{r}
+svmfit  = svm(y~., data=dat, kernel = "radial", gamma=1, cost=1)
+plot(svmfit, dat)
+```
+
+`summary()` can be used to obtain information about svm fit.
+
+```{r}
+summary(svmfit)
+```
+We can perform cross validation here using `tune()` to select best `cost` and $\gamma$.
+
+```{r}
+tune.out = tune(svm, y~., data= dat, kernel = "radial", ranges = list(cost= c(0.1,1,10,100,1000), gamma = c(0.5,1,2,3,4)))
+summary(tune.out)
+```
+
+Best parameters are `cost=1` and `gamma=0.5`.
+
+
+As in linear classifier, now we will make a grid and make predictions on it.
+
+These data have the grid points for each variable included on the data frame.
+
+```{r}
+xgrid = expand.grid(X1=px1, X2=px2)
+ygrid = predict(svmfit,xgrid)
+plot(xgrid,col=as.numeric(ygrid), pch=20, cex=0.2)
+points(x, col= y+1, pch=19)
+
+```
+
+We can have `predict()` function produce the actual function estimates at each of ou grid points.
+We will be doing that by using `contour()` function.
+We also have `prob` variable in dataframe which gives us true probability for class 1 of data, at the gridpoints.
+
+If we plot at 0.5 contour, we will have true decision boundary which is "Bayes decision boundary" - the best classifier boundary.
+
+
+```{r}
+func = predict(svmfit,xgrid, decision.values = TRUE)
+```
+we set up decision.value = TRUE as we want to get the function not just classification.
+
+```{r}
+func = attributes(func)$decision
+```
+
+```{r}
+plot(xgrid,col=as.numeric(ygrid), pch=20, cex= 0.2)
+points(x, col= y+1, pch=19)
+
+contour(px1,px2,matrix(func, length(px1), length(px2)), level=0, add= TRUE )
+
+contour(px1, px2, matrix(prob, length(px1), length(px2)), level= 0.5, add= TRUE, col="blue", lwd=2)#Bayes Decision Boundary
+
+
+```
+
+
+##ROC Curves
+
+`ROCR` package can be used to produce ROC curves
+
+```{r}
+library(ROCR)
+```
+We will first write a short function to plot a ROC curve given numerical score for each observation `pred` and a vector containing the class label for each observation `truth`.
+
+```{r}
+rocplot = function(pred, truth, ...){
+  predob = prediction(pred, truth)
+  perf = performance(predob, "tpr","fpr")
+  plot(perf, ...)
+}
+```
+
+
+SVM output class labels for each observation. But we can also obtain fitted values for each observation i.e. value of function.
+
+The sign of fitted value determines on which side of decision boundary the observation lies.
+If fitted value exceeds zero then the observation is assigned to one class or if it is less than zero then it is assigned to other. 
+To get fitted values, we use `decision.values=TRUE` when fitting `svm()`. Then the `predict()` will output fitted values.
+
+```{r}
+svmfit.func = svm(y~., data=dat, kernel="radial", gamma=2, cost=1, decision.values= TRUE)
+fitted = predict(svmfit.func,dat,decision.values = TRUE)
+fitted = attributes(fitted)$decision.values
+```
+
+Now, We can produce ROC plot:
+```{r}
+par(mfrow=c(1,2))
+rocplot(fitted, dat[,"y"])
+```
+
+
+
+
+
+
+

@@ -1,0 +1,178 @@
+---
+title: "chapter 9 question 6"
+author: "Mukul Goyal"
+date: "October 22, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Question 6
+
+We wil generate some simulated data that is barely linear seperable. We will create noisy points along line $7x-4y-60=0$
+
+```{r}
+set.seed(1010)
+
+#Class one
+x.one = runif(500,0,90)
+y.one = runif(500,x.one+10,100)
+x.one.noise = runif(50,20,80)
+y.one.noise = 5/4 * (x.one.noise - 10) +0.1
+
+#Class zero
+x.zero = runif(500,10,100)
+y.zero = runif(500,0,x.zero-10)
+x.zero.noise = runif(50,20,80)
+y.zero.noise = 5/4 * (x.zero.noise - 10) - 0.1
+
+#Combine data of both class
+class.one = seq(1,550)
+x = c(x.one,x.one.noise, x.zero, x.zero.noise)
+y = c(y.one, y.one.noise, y.zero, y.zero.noise)
+
+
+plot(x[class.one], y[class.one], col="blue", pch=4, ylim=c(0,100))
+points(x[-class.one], y[-class.one], col="red", pch=4)
+```
+
+Now we calculate the cross-validation errors for range of cost values.
+
+```{r}
+z = rep(0,1100)
+z[class.one] = 1
+data.xy = data.frame(x=x, y=y, z=z)
+```
+
+```{r}
+tune.out = tune(svm, as.factor(z)~., data= data.xy, kernel= "linear" ,ranges = list(cost=c(0.01,0.1,1,5,10,100,1000)))
+summary(tune.out)
+
+```
+Model with `cost=1000` gives out lowest error rate.
+Now, we can make a table of mis-classification rate associated with each cost.
+
+```{r}
+data.frame(tune.out$performances[1], tune.out$performances[2]*1100)
+```
+
+Small value of cost = misclassify a couple of training observation = Wider margin
+
+High value of cost = does not misclassify training observation = narrow margin
+
+
+model with high cost(i.e. `cost =1000`) misclassifies lowest training observation.
+
+
+
+
+We will now generate a test set.
+
+```{r}
+set.seed(10)
+
+x.test = runif(1000,0,100)
+class.one = sample(1000,500)
+y.test = rep(NA,1000)
+
+#Set y > x for class.one
+for(i in class.one){
+  y.test[i] = runif(1, x.test[i],100)
+}
+for (i in setdiff(1:1000, class.one)){
+  y.test[i] = runif(1,0,
+                    x.test[i])
+}
+plot(x.test[class.one], y.test[class.one], col="blue", pch="+")
+points(x.test[-class.one], y.test[-class.one], col="green", pch="x")
+```
+
+This test set satisfies the true decision boundary x=y.
+
+We will now make prediction on test set using models of different cost.
+
+```{r}
+z.test = rep(0,1000)
+z.test[class.one] = 1
+all.costs  = c(0.01,0.1,1,5,10,100,1000)
+test.errors = rep(NA, length(all.costs))
+data.test = data.frame(x = x.test, y= y.test, z= z.test)
+for(i in 1:length(all.costs)){
+  svm.fit = svm(as.factor(z)~., data= data.xy, kernel="linear", cost= all.costs[i])
+  svm.pred = predict(svm.fit, data.test)
+  test.errors[i] = sum(svm.pred != data.test$z)
+  
+}
+data.frame(cost = all.costs, "testmisclass"= test.errors)
+
+```
+
+Model with `cost=5` performs well on test data set rather than model with `cost=1000` as seen previously. Thus model with lower cost performs well on test data set.
+
+
+##Question No.7
+
+```{r}
+library(ISLR)
+library(e1071)
+```
+ 
+**(a)** 
+Creating a binary variable taking 1 for cars with gas mileage above median and 0 for cars with gas mileage below median.
+
+```{r}
+Auto$mileage = ifelse(Auto$mpg > median(Auto$mpg),1,0)
+attach(Auto)
+```
+
+**(b)**
+
+```{r}
+set.seed(100)
+tune.out = tune(svm,as.factor(mileage)~.-mpg, kernel= "linear" ,data= Auto, ranges = list(cost=c(0.01,0.1,1,5,10,100,1000)))
+summary(tune.out)
+```
+
+Lowest CV- error is with a cost of 0.01.
+
+**(c)**
+Trying polynomial kernel with degrees= 1,2,3,4,5
+```{r}
+set.seed(99)
+tune.out = tune(svm, as.factor(mileage)~.-mpg, kernel = "polynomial", data= Auto, ranges = list(cost=c(0.01,0.1,1,5,10,100,1000), degree = c(1,2,3,4,5)))
+summary(tune.out)
+```
+Lowest CV- error is with `cost=100` and `degree=1`.
+
+**(d)**
+
+Now, trying radial kernel:
+
+```{r}
+set.seed(1010)
+tune.out = tune(svm, as.factor(mileage)~.-mpg, kernel = "radial", data= Auto, ranges =  list(cost=c(0.01,0.1,1,5,10), gamma = c(0.01,0.1,1,5,10)))
+summary(tune.out)
+```
+
+Lowest CV- error is with `cost=10` and `gamma= 0.1`.
+
+**(d)**
+
+```{r}
+svm.linear = svm(as.factor(mileage)~., data= Auto, kernel = "linear", cost= 0.01)
+plot(svm.linear, Auto, mpg~weight)
+```
+
+
+```{r}
+plot(svm.linear, Auto, mpg~cylinders)
+```
+```{r}
+plot(svm.linear, Auto, acceleration~weight)
+```
+
+
+
+

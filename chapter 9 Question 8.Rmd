@@ -1,0 +1,32 @@
+---
+title: "chapter 9 Question 8"
+author: "Mukul Goyal"
+date: "October 23, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Question 8
+
+```{r}
+attach(OJ)
+```
+
+**(a)**
+
+```{r}
+train = sample(1:dim(OJ)[1], 800)
+```
+
+**(b)**
+
+```{r}
+svc = svm(as.factor(Purchase)~., data= OJ, kernel = "linear", cost= 0.01 )
+summary(svc)
+```
+
+
+```{r}
